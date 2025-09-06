@@ -1,0 +1,188 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  hashedPassword String
+  role           String    @default("USER") // USER, ADMIN
+  createdAt      DateTime  @default(now())
+  
+  // Relations
+  sessions         Session[]
+  userPref         UserPref?
+  userTopicStatus  UserTopicStatus[]
+  
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("sessions")
+}
+
+model Exam {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  
+  // Relations
+  categories Category[]
+  userPrefs  UserPref[]
+  
+  @@map("exams")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  examId    String
+  name      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  
+  // Relations
+  exam   Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  topics Topic[]
+  
+  @@map("categories")
+}
+
+model Topic {
+  id         String   @id @default(cuid())
+  categoryId String
+  name       String
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  
+  // Relations
+  category         Category         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  contents         Content[]
+  questions        Question[]
+  tests            Test[]
+  userTopicStatus  UserTopicStatus[]
+  
+  @@map("topics")
+}
+
+model Content {
+  id          String        @id @default(cuid())
+  topicId     String
+  type        String        // LECTURE_VIDEO, QUIZ, TEST, REVISION_VIDEO
+  provider    String        @default("YOUTUBE") // YOUTUBE, VIMEO, LINK, PDF
+  title       String
+  url         String
+  durationSec Int?
+  metaJson    String?       // JSON string for additional metadata
+  createdAt   DateTime      @default(now())
+  
+  // Relations
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  
+  @@map("contents")
+}
+
+model Question {
+  id          String         @id @default(cuid())
+  topicId     String
+  stem        String
+  explanation String?
+  difficulty  String         @default("MEDIUM") // EASY, MEDIUM, HARD
+  createdAt   DateTime       @default(now())
+  
+  // Relations
+  topic        Topic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  choices      Choice[]
+  testQuestions TestQuestion[]
+  
+  @@map("questions")
+}
+
+model Choice {
+  id         String @id @default(cuid())
+  questionId String
+  text       String
+  isCorrect  Boolean @default(false)
+  
+  // Relations
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  @@map("choices")
+}
+
+model Test {
+  id           String   @id @default(cuid())
+  topicId      String
+  name         String
+  durationMin  Int?
+  settingsJson String?  // JSON string for test settings
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  topic         Topic          @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  testQuestions TestQuestion[]
+  
+  @@map("tests")
+}
+
+model TestQuestion {
+  testId     String
+  questionId String
+  order      Int @default(0)
+  
+  // Relations
+  test     Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  @@id([testId, questionId])
+  @@map("test_questions")
+}
+
+model UserPref {
+  id     String @id @default(cuid())
+  userId String @unique
+  examId String
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam Exam @relation(fields: [examId], references: [id])
+  
+  @@map("user_prefs")
+}
+
+model UserTopicStatus {
+  id        String           @id @default(cuid())
+  userId    String
+  topicId   String
+  status    String           @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, DONE
+  updatedAt DateTime         @default(now())
+  
+  // Relations
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, topicId])
+  @@map("user_topic_status")
+}
+
+// Enums are defined as strings in SQLite
+// UserRole: USER, ADMIN
+// ContentType: LECTURE_VIDEO, QUIZ, TEST, REVISION_VIDEO
+// ContentProvider: YOUTUBE, VIMEO, LINK, PDF
+// QuestionDifficulty: EASY, MEDIUM, HARD
+// TopicStatus: NOT_STARTED, IN_PROGRESS, DONE
